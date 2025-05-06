@@ -78,7 +78,6 @@ waveguide_type_delay='Si routing TE 1550 nm (compound waveguide)'
 # SiEPIC create_cell2 is an enhanced version (with error checking) of pya.Layout.create_cell
 cell_ebeam_gc = create_cell2(ly, 'GC_TE_1550_8degOxide_BB', tech_name)
 cell_ebeam_y = create_cell2(ly, 'ebeam_y_1550', tech_name)
-cell_ebeam_y_dream = create_cell2(ly, 'ebeam_dream_splitter_1x2_te1550_BB', 'EBeam-Dream')
 
 # grating couplers, place at absolute positions
 # automated test label
@@ -107,7 +106,7 @@ connect_pins_with_waveguide(instGC[0], 'opt1', instY2, 'opt1', waveguide_type=wa
 connect_pins_with_waveguide(instY1, 'opt2', instY2, 'opt3', waveguide_type=waveguide_type)
 connect_pins_with_waveguide(instY1, 'opt3', instY2, 'opt2', waveguide_type=waveguide_type,turtle_B=[25,-90])
 
-# 2nd MZI using Dream Photonics 1x2 splitter
+# 2nd MZI
 # grating couplers, place at absolute positions
 x,y = 180000, 15000
 instGC = coupler_array(cell, 
@@ -120,9 +119,9 @@ instGC = coupler_array(cell,
          )    
 
 # Y branches:
-instY1 = connect_cell(instGC[1], 'opt1', cell_ebeam_y_dream, 'opt1')
+instY1 = connect_cell(instGC[1], 'opt1', cell_ebeam_y, 'opt1')
 instY1.transform(Trans(20000,0))
-instY2 = connect_cell(instGC[0], 'opt1', cell_ebeam_y_dream, 'opt1')
+instY2 = connect_cell(instGC[0], 'opt1', cell_ebeam_y, 'opt1')
 instY2.transform(Trans(20000,0))
 
 # Waveguides:
@@ -148,9 +147,9 @@ instGC = coupler_array(cell,
          )    
 
 # Y branches:
-instY1 = connect_cell(instGC[1], 'opt1', cell_ebeam_y_dream, 'opt1')
+instY1 = connect_cell(instGC[1], 'opt1', cell_ebeam_y, 'opt1')
 instY1.transform(Trans(20000,0))
-instY2 = connect_cell(instGC[0], 'opt1', cell_ebeam_y_dream, 'opt1')
+instY2 = connect_cell(instGC[0], 'opt1', cell_ebeam_y, 'opt1')
 instY2.transform(Trans(20000,0))
 
 # Spiral:
