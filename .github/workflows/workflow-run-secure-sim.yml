@@ -1,0 +1,150 @@
+name: Secure Simulation via workflow_run (with PR resolution)
+
+on:
+  workflow_run:
+    workflows: ["Detect Simulation Upload (Fork PR)"]
+    types:
+      - completed
+
+jobs:
+  secure-sim:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout triggering commit
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Fetch base branch
+        run: |
+          git fetch origin main --no-tags --prune --unshallow
+
+      - name: Setup GitHub CLI
+        run: |
+          sudo apt update
+          sudo apt install -y gh
+
+      - name: Get PR number from branch
+        id: getpr
+        run: |
+          echo "Finding PR and username for branch: ${{ github.event.workflow_run.head_branch }}"
+          PR_JSON=$(gh pr list --state open --json number,author -L 1 --search "head:${{ github.event.workflow_run.head_branch }}")
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number')
+          USERNAME=$(echo "$PR_JSON" | jq -r '.[0].author.login')
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "Found username: $USERNAME"
+          echo "Found PR #: $PR_NUMBER"
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+
+      - name: Detect simulation files
+        id: check_files
+        run: |
+          USERNAME="${{ steps.getpr.outputs.username }}"
+          echo "Detected GitHub username: $USERNAME"
+
+          FILES=$(git diff --name-only origin/main...HEAD | grep "^simulations/$USERNAME/.*\.py$" || true)
+
+          if [ -z "$FILES" ]; then
+            echo "No .py files in simulations/$USERNAME/"
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "$FILES"
+            echo "$FILES" > files_to_copy.txt
+            echo "found=true" >> $GITHUB_OUTPUT
+          fi
+
+      # - name: Ensure PR header in submitted files
+      #   if: steps.check_files.outputs.found == 'true'
+      #   run: |
+      #     USERNAME="${{ steps.getpr.outputs.username }}"
+      #     PR_NUM="${{ steps.getpr.outputs.pr_number }}"
+      #     PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUM"
+      #
+      #     git config user.name "github-actions"
+      #     git config user.email "github-actions@github.com"
+      #
+      #     while IFS= read -r file; do
+      #       echo "Checking file: $file"
+      #
+      #       if ! head -n 5 "$file" | grep -q "script submitted via Pull Request"; then
+      #         echo "Prepending header to $file"
+      #         TEMPFILE=$(mktemp)
+      #         echo "# script submitted via Pull Request: $PR_URL" > "$TEMPFILE"
+      #         cat "$file" >> "$TEMPFILE"
+      #         mv "$TEMPFILE" "$file"
+      #         git add "$file"
+      #       else
+      #         echo "Header already present in $file"
+      #       fi
+      #     done < files_to_copy.txt
+      #
+      #     git commit -m "Add PR header to simulation scripts" || echo "No changes"
+      #
+      #     curl -H "Authorization: token YOUR_PAT" https://api.github.com/user
+      #
+      #     git push origin HEAD:refs/heads/${{ github.event.workflow_run.head_branch }}
+      #
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.PAT }}
+
+      - name: Setup SSH
+        if: steps.check_files.outputs.found == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "Invalid SSH key"
+
+          # Write SSH config with ProxyJump
+          cat <<EOF > ~/.ssh/config
+          Host turing
+            HostName turing.phas.ubc.ca
+            User lukasc
+            Port 7743
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+
+          Host baker
+            User lukasc
+            ProxyJump turing
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+          EOF
+
+          chmod 600 ~/.ssh/config
+
+      - name: Copy .py files to Baker
+        if: steps.check_files.outputs.found == 'true'
+        run: |
+
+          echo "Simulating for PR #${{ steps.getpr.outputs.pr_number }}..."
+          echo "simulation files:"
+          cat files_to_copy.txt
+
+          USERNAME="${{ steps.getpr.outputs.username }}"
+          ssh baker "mkdir -p ~/simulations/$USERNAME"
+
+          while IFS= read -r file; do
+            echo "Copying $file to baker:~/simulations/$USERNAME/"
+            scp "$file" baker:~/simulations/$USERNAME/
+            if [ $? -ne 0 ]; then
+              echo "❌ Failed to copy $file"
+              exit 1
+            fi
+          done < files_to_copy.txt
+
+
+      - name: Post result comment
+        if: steps.check_files.outputs.found == 'true'
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.repository }}
+          issue-number: ${{ steps.getpr.outputs.pr_number }}
+          body: |
+            ✅ Uploaded files for simulation, for PR #${{ steps.getpr.outputs.pr_number }}.

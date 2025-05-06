@@ -1,0 +1,47 @@
+
+name: Trigger Simulation via Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: read
+  pull-requests: read
+
+jobs:
+  run-secure-sim:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/run-sim') &&
+      (
+        github.event.comment.user.login == 'lukasc-ubc' ||
+        github.event.comment.user.login == 'trusted-contributor1' ||
+        github.event.comment.user.login == 'trusted-contributor2'
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify PR
+        run: |
+          echo "Comment on PR #${{ github.event.issue.number }} by ${{ github.event.comment.user.login }}"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          echo "🔍 Checking file size:"
+          wc -c ~/.ssh/id_ed25519
+
+          ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "Invalid SSH key"
+
+      - name: Run Secure Simulation
+        run: |
+          echo "Running secure simulation triggered by /run-sim comment."
+          # Add actual scp / ssh / post results here
+

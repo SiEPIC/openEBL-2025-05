@@ -1,0 +1,36 @@
+name: Secure Simulation Job
+
+on:
+  push:
+    branches:
+      - sim-trigger
+
+jobs:
+  secure-sim:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout trigger
+        uses: actions/checkout@v4
+
+      - name: Read trigger file
+        id: payload
+        run: |
+          cat trigger.json
+          echo "pr_number=$(jq -r .pr_number trigger.json)" >> $GITHUB_OUTPUT
+          echo "username=$(jq -r .username trigger.json)" >> $GITHUB_OUTPUT
+          echo "branch=$(jq -r .branch trigger.json)" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "Invalid SSH key"
+
+      - name: Secure Job (Sim)
+        run: |
+          echo "Running for PR ${{ steps.payload.outputs.pr_number }} by ${{ steps.payload.outputs.username }}"
+          # scp/ssh logic here
+
+

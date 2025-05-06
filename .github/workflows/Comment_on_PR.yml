@@ -1,3 +1,4 @@
+
 name: Comment on PR
 
 on: pull_request_target
@@ -15,4 +16,5 @@ jobs:
         with:
           message: |
             Thank you for your pull request! :wave:
+          comment_tag: welcome-message
 

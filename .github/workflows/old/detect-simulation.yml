@@ -1,0 +1,38 @@
+name: Detect Simulation File in Forked PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'simulations/**.py'
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate trigger payload
+        run: |
+          mkdir trigger
+          echo "{
+            \"pr_number\": \"${{ github.event.pull_request.number }}\",
+            \"username\": \"${{ github.actor }}\",
+            \"branch\": \"${{ github.head_ref }}\"
+          }" > trigger/trigger.json
+
+      - name: Commit to trigger branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          
+          git clone --depth=1 https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} temp
+          cd temp
+
+          git checkout -B sim-trigger
+          cp ../trigger/trigger.json .
+          git add trigger.json
+          git commit -m "Trigger secure sim for PR #${{ github.event.pull_request.number }}" || echo "No changes"
+          git push -f origin sim-trigger
+
+

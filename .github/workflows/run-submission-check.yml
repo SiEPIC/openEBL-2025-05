@@ -15,8 +15,11 @@ on:
     branches:
       - '**'
   pull_request:
-    branches:
-      - '**'
+    paths:
+      - 'submissions/**.gds'
+      - 'submissions/**.GDS'
+      - 'submissions/**.oas'
+      - 'submissions/**.OAS'
 
 
 jobs:

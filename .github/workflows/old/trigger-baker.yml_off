@@ -1,0 +1,92 @@
+name: Run Simulation on Baker
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'simulations/**.py'
+
+jobs:
+  run-simulation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for git diff to compare branches
+
+      - name: Set up SSH key and config
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # Optional debug: confirm the key was written (no content shown)
+          echo "SSH private key length:"
+          wc -c ~/.ssh/id_ed25519
+
+          echo "${{ secrets.PAT }}" > ~/.ssh/id_test
+          wc -c ~/.ssh/id_test
+
+          # Write SSH config with ProxyJump
+          cat <<EOF > ~/.ssh/config
+          Host turing
+            HostName turing.phas.ubc.ca
+            User lukasc
+            Port 7743
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+
+          Host baker
+            User lukasc
+            ProxyJump turing
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+          EOF
+
+          chmod 600 ~/.ssh/config
+
+      - name: Check if secret is set
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "SSH_PRIVATE_KEY is EMPTY"
+          else
+            echo "SSH_PRIVATE_KEY is present (masked)"
+          fi
+
+
+      - name: Validate private key
+        run: ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "Invalid key format"
+
+
+      - name: Detect Python files in simulations/<username>/
+        id: check_files
+        run: |
+          USERNAME="${{ github.actor }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+
+          # List only added/changed files in simulations/<username>/
+          FILES=$(git diff --name-only origin/$BASE_BRANCH...HEAD | grep "^simulations/$USERNAME/.*\.py$" || true)
+
+          if [ -z "$FILES" ]; then
+            echo "No matching .py files found in simulations/$USERNAME/"
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "$FILES" > files_to_copy.txt
+            echo "found=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Copy .py files to Baker
+        if: steps.check_files.outputs.found == 'true'
+        run: |
+          USERNAME="${{ github.actor }}"
+          ssh baker "mkdir -p ~/simulations/$USERNAME"
+
+          while read file; do
+            echo "Copying $file to baker:~/simulations/$USERNAME/"
+            scp "$file" baker:~/simulations/$USERNAME/
+          done < files_to_copy.txt
+
+

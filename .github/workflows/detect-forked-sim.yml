@@ -1,0 +1,59 @@
+name: Detect Simulation Upload (Fork PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'simulations/**.py'
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    
+    steps:
+      
+      - name: Confirm simulation file exists
+        run: echo "Detected simulation Python file in forked PR."
+
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Validate simulation file paths
+        id: validate
+        run: |
+          USERNAME="${{ github.event.pull_request.user.login }}"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          echo "Fetching base SHA $BASE..."
+          git fetch origin $BASE --depth=1
+
+          echo "Diffing $BASE...$HEAD: looking for files submitted by the fork PR"
+          FILES=$(git diff --diff-filter=AM --name-only $BASE $HEAD -- 'simulations/**/*.py' || true)
+          echo "$FILES" | tee all_py_files.txt
+
+          MATCHED_FILES=()
+          INVALID_FILES=()
+          while IFS= read -r file; do
+            if [[ "$file" =~ ^simulations/$USERNAME/[^/]+\.py$ ]]; then
+              MATCHED_FILES+=("$file")
+            else
+              INVALID_FILES+=("$file")
+            fi
+          done < all_py_files.txt
+
+          if [ ${#INVALID_FILES[@]} -gt 0 ]; then
+            echo "❌ Invalid file paths:"
+            for f in "${INVALID_FILES[@]}"; do echo "  - $f"; done
+            exit 1
+          fi
+
+          printf "%s\n" "${MATCHED_FILES[@]}" > matched_files.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: matched-files
+          path: matched_files.txt

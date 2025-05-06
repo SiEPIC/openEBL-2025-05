@@ -3,6 +3,11 @@ name: Check GDS and OAS File Submissions
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - '**.oas'
+      - '**.gds'
+      - '**.OAS'
+      - '**.GDS'
 
 jobs:
   check_files:

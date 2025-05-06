@@ -1,0 +1,21 @@
+name: Auto Comment to Trigger Secure Sim
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'simulations/**.py'
+
+jobs:
+  auto-comment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Comment /run-sim
+        run: |
+          gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -f body='/run-sim'
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+
+

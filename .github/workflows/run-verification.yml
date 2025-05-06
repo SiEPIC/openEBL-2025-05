@@ -1,4 +1,4 @@
-name: Functional Verification "V"
+name: Run Layout Verification
 
 on:
   workflow_dispatch:
@@ -17,6 +17,11 @@ on:
   pull_request:
     branches:
       - '**'
+    paths:
+      - 'submissions/**.gds'
+      - 'submissions/**.GDS'
+      - 'submissions/**.oas'
+      - 'submissions/**.OAS'
 
   # by default, GitHub only runs workflows on pull requests for approved users; this should allow it to run workshops on new users as well:
   #pull_request_target:
