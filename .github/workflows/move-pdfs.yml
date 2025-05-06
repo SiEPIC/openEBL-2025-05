@@ -28,10 +28,9 @@ jobs:
             echo "Only PDF files detected. Safe to merge."
             echo "result=pass" >> $GITHUB_OUTPUT
           fi
-
       - name: Auto-merge PR
         if: steps.check.outputs.result == 'pass'
         run: |
-          gh pr merge ${{ github.event.pull_request.html_url }} --squash --admin
+          gh pr merge ${{ github.event.pull_request.html_url }} --squash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
