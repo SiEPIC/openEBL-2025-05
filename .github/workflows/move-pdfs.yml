@@ -12,21 +12,22 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v3
 
-      - name: Check changed files are all PDFs
+      - name: Check changed files are only PDFs
         id: check
         run: |
-          git fetch origin ${{ github.base_ref }}
-          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
-          echo "Changed files: $changed"
-          if echo "$changed" | grep -vE '\.pdf$'; then
-            echo "Non-PDF files detected. Skipping merge."
+          changed=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          echo "Changed files:"
+          echo "$changed"
+
+          if echo "$changed" | grep -Pv '\.pdf$'; then
+            echo "Non-PDF files detected. Skipping auto-merge."
             echo "result=fail" >> $GITHUB_OUTPUT
           else
             echo "Only PDF files detected. Safe to merge."
             echo "result=pass" >> $GITHUB_OUTPUT
           fi
 
-      - name: Auto-merge PDF PR
+      - name: Auto-merge PR
         if: steps.check.outputs.result == 'pass'
         run: |
           gh pr merge ${{ github.event.pull_request.html_url }} --squash --admin
