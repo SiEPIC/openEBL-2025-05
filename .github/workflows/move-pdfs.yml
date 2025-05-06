@@ -1,33 +1,34 @@
-name: Auto-move submitted PDFs
+name: Auto-merge PDF-only PRs
 
 on:
-  push:
-    paths:
-      - '**/*.pdf'
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
-  move-pdfs:
+  auto-merge:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Move PDF files to reports/
+      - name: Check changed files are all PDFs
+        id: check
         run: |
-          mkdir -p reports
-          shopt -s globstar nullglob
-          for f in **/*.pdf; do
-            [[ "$f" == reports/* ]] && continue
-            mv "$f" "reports/$(basename "$f")"
-          done
+          git fetch origin ${{ github.base_ref }}
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files: $changed"
+          if echo "$changed" | grep -vE '\.pdf$'; then
+            echo "Non-PDF files detected. Skipping merge."
+            echo "result=fail" >> $GITHUB_OUTPUT
+          else
+            echo "Only PDF files detected. Safe to merge."
+            echo "result=pass" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Commit and push changes
+      - name: Auto-merge PDF PR
+        if: steps.check.outputs.result == 'pass'
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add reports/*.pdf
-          git diff --cached --quiet || git commit -m "Auto-move PDFs to reports/"
-          git push
+          gh pr merge ${{ github.event.pull_request.html_url }} --squash --admin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
