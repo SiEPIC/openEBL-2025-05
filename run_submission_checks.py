@@ -36,7 +36,12 @@ bb_cells = [
 
 
 # gds file to run verification on
-gds_file = sys.argv[1]
+if len(sys.argv) > 1:
+   gds_file = sys.argv[1]
+else:
+   print('run this script by passing the file name as parameter')
+   print('running as a demo using submissions/EBeam_LukasChrostowski_MZI.oas')
+   gds_file = "submissions/EBeam_LukasChrostowski_MZI.oas"
 
 print('')
 print('')
@@ -75,9 +80,40 @@ try:
    # Make sure layout extent fits within the allocated area.
    cell_Width = 605000
    cell_Height = 410000
-   bbox = top_cell.bbox()
-   if bbox.width() > cell_Width or bbox.height() > cell_Height:
-      print('Error: Cell bounding box / extent (%s, %s) is larger than the maximum size of %s X %s microns' % (bbox.width()/1000, bbox.height()/1000, cell_Width/1000, cell_Height/1000) )
+
+   # Define the layers of interest
+   layers_of_interest = [(1, 0), (4, 0)]
+
+   # Initialize an empty bounding box
+   combined_bbox = pya.Region()
+   
+   # print(top_cell.layout().layer_indexes())
+
+   # Loop through layers and merge bounding boxes
+   for layer_num, layer_dt in layers_of_interest:
+      layer_index = layout.find_layer(pya.LayerInfo(layer_num, layer_dt))
+      # print(f'layer: {layer_num} / {layer_dt} - {layer_index}')
+      if layer_index == None:
+         continue  # layer not found, skip
+      bbox = top_cell.bbox_per_layer(layer_index)
+      # print(bbox)
+      combined_bbox += pya.Region(bbox)
+
+   combined_bbox.merge()
+      
+   if combined_bbox:
+      w = combined_bbox.bbox().width()
+      h = combined_bbox.bbox().height()
+      if w > cell_Width or h > cell_Height:
+         print("Error: Bounding box of selected layers (%.3f µm x %.3f µm) exceeds allowed size %.3f µm x %.3f µm" %
+               (w / 1000, h / 1000,
+                  cell_Width / 1000, cell_Height / 1000))
+         num_errors += 1
+      else:
+         print("Bounding box of selected layers is %.3f µm x %.3f µm" %
+               (w / 1000, h / 1000))
+   else:
+      print("No shapes found in the specified layers.")
       num_errors += 1
 
 

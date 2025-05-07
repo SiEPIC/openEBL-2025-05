@@ -61,6 +61,7 @@ jobs:
         #  # https://github.com/MestreLion/git-tools?tab=readme-ov-file#installation
         #  sudo apt install git-restore-mtime
         #  git restore-mtime
+        if: env.TRIGGER_INFO != 'pull request'
 
       # can also specify Python version if needed
       - name: setup python
@@ -68,15 +69,17 @@ jobs:
         with:
           python-version: '3.11' 
           cache: 'pip'
+        if: env.TRIGGER_INFO != 'pull request'
 
       - name: install Python packages
         run: |
           pip install siepic_ebeam_pdk IPython
+        if: env.TRIGGER_INFO != 'pull request'
           
       - name: run Aggregation script
         run: |
-
           python merge/EBeam_merge.py
+        if: env.TRIGGER_INFO != 'pull request'
 
       - name: move Aggregation output files to new folder
         run: |
@@ -90,6 +93,7 @@ jobs:
           for file in $output_files; do
             cp "merge/$file" merge_output/
           done
+        if: env.TRIGGER_INFO != 'pull request'
 
       - name: upload artifact
         uses: actions/upload-artifact@v4
@@ -97,6 +101,7 @@ jobs:
         with:
           name: merge-files
           path: merge_output/
+        if: env.TRIGGER_INFO != 'pull request'
 
       - name: get artifact url
         run: |
@@ -113,6 +118,7 @@ jobs:
 
           echo "ARTIFACT_URL=$ARTIFACT_URL" >> $GITHUB_ENV
           echo "OWNER=$OWNER" >> $GITHUB_ENV
+        if: env.TRIGGER_INFO != 'pull request'
 
       - name: update url in runner README
         run: |
@@ -124,36 +130,8 @@ jobs:
 
           # add new URL
           printf "$start_delim\n$ARTIFACT_URL\n$end_delim\n" >> README.md
+        if: env.TRIGGER_INFO != 'pull request'
 
-
-      #- name: Create and switch to a temporary branch
-      #  run: |
-      #    git checkout -b update-readme-${{ github.run_id }}
-
-      #- name: Commit and push changes
-      #  run: |
-      #    git config --local user.email "${{ github.actor }}@users.noreply.github.com"
-      #    git config --local user.name "${{ github.actor }}"
-      #    git add README.md merge/EBeam.png
-      #    git commit -m "Aggregation layout: $ARTIFACT_URL"
-      #    git push origin update-readme-${{ github.run_id }}
-
-      #- name: Create Pull Request
-      #  uses: peter-evans/create-pull-request@v5
-      #  with:
-      #    token: ${{ secrets.GITHUB_TOKEN }}
-      #    branch: update-readme-${{ github.run_id }}
-      #    base: main
-      #    title: "Automated README update"
-      #    body: "This PR updates README and aggregation layout."
-      #    delete-branch: true
-
-      #- name: Setup SSH Deploy Key
-      #  run: |
-      #    mkdir -p ~/.ssh
-      #    echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-      #    chmod 600 ~/.ssh/id_ed25519
-      #    ssh-keyscan github.com >> ~/.ssh/known_hosts
 
       - name: Commit and Push Changes
         run: |
@@ -165,18 +143,3 @@ jobs:
           git commit -m "Aggregation layout: $ARTIFACT_URL"
           git push origin main
         if: env.TRIGGER_INFO != 'pull request' && github.repository_owner == 'SiEPIC'
-
-      # Aggregation script always runs on any PR
-      # this ensures link is only updated after a PR is Aggregation into SiEPIC
-      #- name: commit and push changes to README if we are in SiEPIC repo
-      #  run: |
-      #    git pull origin main
-      #    git diff
-      #    git config --local user.email "${{ github.actor }}@users.noreply.github.com"
-      #    git config --local user.name "${{ github.actor }}"
-      #    git add README.md
-      #    git add merge/EBeam.png
-      #    git commit -m "Aggregation layout: $ARTIFACT_URL"
-      #    git push
-      #  if: env.TRIGGER_INFO != 'pull request' && github.repository_owner == 'SiEPIC'
-

@@ -3,7 +3,7 @@ import os
 
 import klayout.db as pya
 from SiEPIC.utils import get_layout_variables
-#from SiEPIC.utils.layout import find_opt_in_labels
+from SiEPIC.utils import find_automated_measurement_labels
 from SiEPIC.opics_netlist_sim import circuit_simulation_opics
 
 import siepic_ebeam_pdk
@@ -23,13 +23,8 @@ def main(file_gds):
     layer_index = layout.layer(pya.LayerInfo(10, 0))
 
     # Extract opt-in labels
-    opt_in_labels = []
-    for shape in top_cell.shapes(layer_index).each():
-        if shape.is_text():
-            label_text = shape.text.string
-            if "opt_in" in label_text:
-                opt_in_labels.append(label_text)
-
+    text_out, opt_in  = find_automated_measurement_labels(topcell=top_cell)
+    opt_in_labels = [o['opt_in'] for o in opt_in]
     print(f"Found {len(opt_in_labels)} opt-in labels: {opt_in_labels}")
 
     # Extract base path and filename (without extension)

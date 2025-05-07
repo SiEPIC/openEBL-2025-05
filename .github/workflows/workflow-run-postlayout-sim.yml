@@ -26,27 +26,23 @@ jobs:
         run: |
           git fetch origin main --no-tags --prune --unshallow
 
-      - name: Install GitHub CLI manually
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
-            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
-            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt-get update -y
-          sudo apt-get install -y gh
 
-      - name: Get PR number from branch
+      - name: Get PR number, username, and fork repo
         id: getpr
         run: |
           echo "Finding PR and username for branch: ${{ github.event.workflow_run.head_branch }}"
-          PR_JSON=$(gh pr list --state open --json number,author -L 1 --search "head:${{ github.event.workflow_run.head_branch }}")
+          PR_JSON=$(gh pr list --state open --json number,author,headRepositoryOwner,headRefName -L 1 --search "head:${{ github.event.workflow_run.head_branch }}")
           PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number')
           USERNAME=$(echo "$PR_JSON" | jq -r '.[0].author.login')
+          FORK_OWNER=$(echo "$PR_JSON" | jq -r '.[0].headRepositoryOwner.login')
+          REPO_NAME=$(basename "${{ github.repository }}")
+          FORK_REPO="$FORK_OWNER/$REPO_NAME"
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "fork_repo=$FORK_REPO" >> $GITHUB_OUTPUT
           echo "Found username: $USERNAME"
           echo "Found PR #: $PR_NUMBER"
+          echo "Fork repo: $FORK_REPO"
         env:
           GH_TOKEN: ${{ secrets.PAT }}
 
@@ -169,8 +165,8 @@ jobs:
           USERNAME="${{ steps.getpr.outputs.username }}"
           BRANCH_NAME="${{ github.event.workflow_run.head_branch }}"
           echo "Resolving fork repository for PR #$PR_NUMBER..."
-          FORK_REPO=$(gh pr view "$PR_NUMBER" --json headRepository --jq '.headRepository.fullName')
-
+          
+          FORK_REPO=${{ steps.getpr.outputs.fork_repo }}
           echo "Committing PNGs to forked PR branch: $FORK_REPO $BRANCH_NAME"
 
           # Clone forked repo + checkout PR branch
@@ -196,15 +192,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
 
+
       - name: Append PNG links to comment
         if: steps.check_files.outputs.found == 'true'
         run: |
           echo "📸 Simulation result image(s):" >> comment.txt
-          for img in submissions/*.png; do
+          BRANCH_NAME="${{ github.event.workflow_run.head_branch }}"
+          FORK_REPO="${{ steps.getpr.outputs.fork_repo }}"
+          for img in output/*.png; do
             [ -f "$img" ] || continue
             FILENAME=$(basename "$img")
-            echo "![${FILENAME}](https://github.com/${{ steps.getpr.outputs.username }}/openEBL-2025-05/blob/${{ github.event.workflow_run.head_branch }}/submissions/${FILENAME}?raw=true)" >> comment.txt
+            echo "![${FILENAME}](https://github.com/${FORK_REPO}/blob/${BRANCH_NAME}/submissions/${FILENAME}?raw=true)" >> comment.txt
+          done
 
+          
       - name: Post simulation results as PR comment
         if: steps.check_files.outputs.found == 'true'
         uses: peter-evans/create-or-update-comment@v3
