@@ -127,11 +127,11 @@ jobs:
           cat files_to_copy.txt
 
           USERNAME="${{ steps.getpr.outputs.username }}"
-          ssh baker "mkdir -p ~/server_simulations/$USERNAME"
+          ssh baker "mkdir -p ~/server_simulations"
 
           while IFS= read -r file; do
-            echo "Copying $file to baker:~/server_simulations/$USERNAME/"
-            scp "$file" baker:~/server_simulations/$USERNAME/
+            echo "Copying $file to baker:~/server_simulations/"
+            scp "$file" baker:~/server_simulations/
             if [ $? -ne 0 ]; then
               echo "❌ Failed to copy $file"
               exit 1
