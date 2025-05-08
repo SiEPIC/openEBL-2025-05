@@ -137,7 +137,7 @@ jobs:
               exit 1
             fi
           done < files_to_copy.txt
-
+          ssh baker "touch ~/server_simulations/$USERNAME/.ready"
 
       - name: Post result comment
         if: steps.check_files.outputs.found == 'true'
