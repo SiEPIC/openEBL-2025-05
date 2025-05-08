@@ -14,7 +14,7 @@ by Lukas Chrostowski, 2025, SiEPIC Program
 import lumapi
 import numpy as np
 import matplotlib.pyplot as plt
-print("test1010124a03")
+print("test1010124a03a")
 class Waveguide():
     '''
     Units: meters 
