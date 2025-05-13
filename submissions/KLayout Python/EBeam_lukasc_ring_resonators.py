@@ -2,7 +2,7 @@
 # $show-in-menu
 # $group-name: Examples_EBeam
 # $menu-path: siepic_menu.exlayout.begin
-  
+   
  
 """
 Scripted layout for ring resonators using KLayout and SiEPIC-Tools
@@ -37,7 +37,7 @@ class ring_layout():
         self.wg_width = 0.5 # microns
 
         # Layout parameters
-        self.filename = "EBeam_lukasc_ring_resonators" 
+        self.filename = "EBeam_lukasc_ring_resonators2" 
         self.x_offset = 10  # horizontal spacing between the designs
 
     def layout(self):
