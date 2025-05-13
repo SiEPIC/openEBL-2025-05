@@ -36,6 +36,7 @@ class ring_layout():
         self.wg_width = 0.5 # microns
 
         # Layout parameters
+        self.filename = "EBeam_lukasc_ring_resonators" 
         self.x_offset = 10  # horizontal spacing between the designs
 
     def layout(self):
@@ -161,13 +162,12 @@ class ring_layout():
         
         # Save
         path = os.path.dirname(os.path.realpath(__file__))
-        filename = "EBeam_ring_resonators"
         file_out = export_layout(
-            self.top_cell, path, filename, relative_path="..", format="oas", screenshot=True
+            self.top_cell, path, self.filename, relative_path="..", format="oas", screenshot=True
         )
 
         print(" - verification")
-        file_lyrdb = os.path.join(path, filename + ".lyrdb")
+        file_lyrdb = os.path.join(path, self.filename + ".lyrdb")
         num_errors = layout_check(cell=self.top_cell, verbose=False, GUI=True, file_rdb=file_lyrdb)
 
         if Python_Env == "Script":
