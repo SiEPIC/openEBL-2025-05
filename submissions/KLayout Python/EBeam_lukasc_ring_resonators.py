@@ -37,7 +37,7 @@ class ring_layout():
         self.wg_width = 0.5 # microns
 
         # Layout parameters
-        self.filename = "EBeam_lukasc_ring_resonators2" 
+        self.filename = os.path.splitext(os.path.basename(__file__))[0]
         self.x_offset = 10  # horizontal spacing between the designs
 
     def layout(self):
