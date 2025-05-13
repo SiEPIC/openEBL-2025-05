@@ -64,7 +64,7 @@ class ring_layout():
         with a top cell
         and Draw the floor plan
         """
-        self.top_cell, self.ly = new_layout(self.tech_name, "top", GUI=True, overwrite=True)
+        self.top_cell, self.ly = new_layout(self.tech_name, self.filename, GUI=True, overwrite=True)
         top_cell, ly = self.top_cell, self.ly
         floorplan(top_cell, 605e3, 410e3)
 
