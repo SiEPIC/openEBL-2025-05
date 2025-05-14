@@ -37,7 +37,7 @@ class ring_layout():
 
         # Layout parameters
         self.filename = "EBeam_lukasc_ring_resonators" 
-        self.x_offset = 10  # horizontal spacing between the designs
+        self.x_offset = 11  # horizontal spacing between the designs
 
     def layout(self):
         '''Create a layout for testing a double-bus ring resonator.
