@@ -27,7 +27,7 @@ class ring_layout():
     def __init__(self):
         
         # Designer name
-        username = 'lukasc'
+        username = 'Qiuyang'
         
         # Configure parameter sweep
         self.sweep_radius = [3, 5, 10, 10] # microns
