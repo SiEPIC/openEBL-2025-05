@@ -26,6 +26,9 @@ class ring_layout():
 
     def __init__(self):
         
+        # Designer name
+        username = 'lukasc'
+        
         # Configure parameter sweep
         self.sweep_radius = [3, 5, 10, 10] # microns
         self.sweep_gap = [0.07, 0.07, 0.07, 0.10] # microns
@@ -36,8 +39,8 @@ class ring_layout():
         self.wg_width = 0.5 # microns
 
         # Layout parameters
-        self.filename = "EBeam_lukasc_ring_resonators" 
-        self.x_offset = 11  # horizontal spacing between the designs
+        self.filename = f'EBeam_{username}_ring_resonators'
+        self.x_offset = 10  # horizontal spacing between the designs
 
     def layout(self):
         '''Create a layout for testing a double-bus ring resonator.
