@@ -30,8 +30,8 @@ class ring_layout():
         username = 'reza930'
         
         # Configure parameter sweep
-        self.sweep_radius = [3, 5, 10, 10] # microns
-        self.sweep_gap = [0.07, 0.07, 0.07, 0.10] # microns
+        self.sweep_radius = [3, 5, 10, 10, 20, 30] # microns
+        self.sweep_gap = [0.07, 0.07, 0.07, 0.10, .5, 1.0] # microns
         
         # Waveguide parameters
         self.pol = "TE" # polarization
@@ -168,6 +168,11 @@ class ring_layout():
         file_out = export_layout(
             self.top_cell, path, self.filename, relative_path="..", format="oas", screenshot=True
         )
+        
+        f1 = os.path.basename(self.filename).split('.')[0]
+        f2 = os.path.basename(__file__).split('.')[0]
+        if not f1 == f2:
+            raise Exception (f'For submission to SiEPIC openEBL, the Python filename needs to be the same as the Layout (GDS/OAS) file: {f1} vs {f2}.')
 
         print(" - verification")
         file_lyrdb = os.path.join(path, self.filename + ".lyrdb")
