@@ -30,8 +30,8 @@ class ring_layout():
         username = 'reza930'
         
         # Configure parameter sweep
-        self.sweep_radius = [3, 5, 10, 10, 20, 30] # microns
-        self.sweep_gap = [0.07, 0.07, 0.07, 0.10, .5, 1.0] # microns
+        self.sweep_radius = [3, 5, 10, 10] # microns
+        self.sweep_gap = [0.07, 0.07, 0.07] # microns
         
         # Waveguide parameters
         self.pol = "TE" # polarization
