@@ -102,6 +102,12 @@ jobs:
           name: python-to-oas-gds
           path: python_to_oas_gds/
 
+      - name: Debug fork info
+        run: |
+          echo "PR fork repo: ${{ github.event.pull_request.head.repo.full_name }}"
+          echo "PR fork branch: ${{ github.event.pull_request.head.ref }}"
+
+          
       - name: commit outputted oas and gds files into repository
         run: |
           git config --local user.email "${{ github.actor }}@users.noreply.github.com"
@@ -120,3 +126,26 @@ jobs:
           echo "done: git push"
         if: github.event_name != 'pull_request'
 
+
+      - name: Check if Actions are enabled on fork
+        id: check_fork_actions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORK_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          echo "Checking Actions on forked repo: $FORK_REPO"
+          RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/repos/$FORK_REPO/actions/permissions)
+      
+          ENABLED=$(echo "$RESPONSE" | jq -r '.enabled')
+          echo "Fork Actions enabled: $ENABLED"
+      
+          if [ "$ENABLED" != "true" ]; then
+            echo "Fork has Actions disabled."
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "❌ GitHub Actions are disabled on your fork. Please enable them by going to the 'Actions' tab in your repository and clicking 'Enable workflows'."
+            exit 1
+          else
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          fi
+              

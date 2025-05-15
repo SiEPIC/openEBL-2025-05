@@ -59,6 +59,12 @@ jobs:
           if [ -z "$FILES" ]; then
             echo "No .gds or .oas files in submissions/"
             echo "found=false" >> $GITHUB_OUTPUT
+            FILES_ALL=$(git diff --diff-filter=AM --name-only origin/main...HEAD  || true)
+            if [ -z "$FILES_ALL" ]; then
+              echo "No files in pull request"
+            else
+              echo "All files in pull request: $FILES_ALL"
+            fi
           else
             echo "$FILES"
             echo "$FILES" > files_to_copy.txt

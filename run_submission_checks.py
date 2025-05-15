@@ -54,7 +54,6 @@ from SiEPIC.scripts import replace_cell, cells_containing_bb_layers
 
 def check():
    
-   print(f' files: {os.listdir(os.path.dirname(gds_file))}')
    
    try:
       # load into layout
@@ -65,6 +64,7 @@ def check():
    except:
       print('Error loading layout')
       print(f' file: {gds_file}')
+      print(f' files in the folder: {os.listdir(os.path.dirname(gds_file))}')
       num_errors = 1
       return num_errors
 
