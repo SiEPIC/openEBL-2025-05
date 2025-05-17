@@ -1,0 +1,36 @@
+name: Resimulate Post-layout simulation verification
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  run-postlayout-sim:
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+
+    steps:
+      - name: Extract PR branch name
+        id: pr-branch
+        if: contains(github.event.comment.body, 'please resimulate')
+        uses: xt0rted/pull-request-comment-branch@v3
+
+      - name: Debug outputs
+        if: contains(github.event.comment.body, 'please resimulate')
+        run: |
+          echo "Event repo: ${{ github.repository }}"
+          echo "PR number: ${{ github.event.issue.number }}"
+          echo "Branch ref (from xt0rted): ${{ steps.pr-branch.outputs.head_ref }}"
+          echo "Comment body: ${{ github.event.comment.body }}"
+
+      - name: Dispatch simulation workflow
+        if: contains(github.event.comment.body, 'please resimulate')
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: "workflow-run-postlayout-sim.yml"
+          ref: ${{ steps.pr-branch.outputs.head_ref }}
+          token: ${{ secrets.PAT }}

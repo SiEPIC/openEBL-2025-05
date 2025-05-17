@@ -130,7 +130,7 @@ max_cell_Width = 0
 
 import subprocess
 import pandas as pd
-for f in [f for f in files_in if '.oas' in f.lower() or '.gds' in f.lower()]:
+for f in [f for f in files_in if '.oas' in f[-4:].lower() or '.gds' in f[-4:].lower()]:
     basefilename = os.path.basename(f)
 
     # GitHub Action gets the actual time committed.  This can be done locally

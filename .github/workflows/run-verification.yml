@@ -76,6 +76,7 @@ jobs:
           # github actions is not configured to detect files pushed from another action, thus we cannot use the 'else' method below
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
             FILES=$(ls ./binary_files)
+            cp binary_files/* submissions/
           else
             if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
               # triggered on pull request, get all changed / added files from forked repo

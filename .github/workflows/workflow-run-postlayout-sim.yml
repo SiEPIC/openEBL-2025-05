@@ -9,11 +9,13 @@ on:
     workflows: ["Run Layout Verification"]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   secure-sim:
+    
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.repository_owner == 'SiEPIC' }}
 
     steps:
       - name: Checkout triggering commit
@@ -21,11 +23,26 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
       - name: Fetch base branch
         run: |
-          git fetch origin main --no-tags --prune --unshallow
-
+          git fetch origin main --no-tags --prune
+  
+      - name: Debug Git info after checkout
+        run: |
+          echo "Checked out commit:"
+          git rev-parse HEAD
+          echo "Commit message:"
+          git log -1 --pretty=%B
+          echo "Changed files compared to main:"
+          git fetch origin main
+          git diff --name-only origin/main...HEAD > files_changed.txt
+          cat files_changed.txt
+            
+          echo "Commits in this range:"
+          git log --pretty=format:'%h %an <%ae>' origin/main..HEAD || true
+        
 
       - name: Get PR number, username, and fork repo
         id: getpr
@@ -52,11 +69,17 @@ jobs:
           USERNAME="${{ steps.getpr.outputs.username }}"
           echo "Detected GitHub username: $USERNAME"
 
-          FILES=$(git diff --name-only origin/main...HEAD | grep -i -E '\.(gds|oas)$' | sed 's|^submissions/||'  || true)
+          FILES=$(git diff --diff-filter=AM --name-only origin/main...HEAD | grep -i -E '\.(gds|oas)$' | sed 's|^submissions/||'  || true)
 
           if [ -z "$FILES" ]; then
             echo "No .gds or .oas files in submissions/"
             echo "found=false" >> $GITHUB_OUTPUT
+            FILES_ALL=$(git diff --diff-filter=AM --name-only origin/main...HEAD  || true)
+            if [ -z "$FILES_ALL" ]; then
+              echo "No files in pull request"
+            else
+              echo "All files in pull request: $FILES_ALL"
+            fi
           else
             echo "$FILES"
             echo "$FILES" > files_to_copy.txt
@@ -93,24 +116,57 @@ jobs:
       - name: Copy .py files to Baker
         if: steps.check_files.outputs.found == 'true'
         run: |
-
           PR_NUMBER="${{ steps.getpr.outputs.pr_number }}"
+          USERNAME="${{ steps.getpr.outputs.username }}"
+      
           echo "Simulating for PR $PR_NUMBER"
+
+          if [ -z "$USERNAME" ]; then
+            echo "❌ USERNAME is blank. Refusing to proceed."
+            exit 1
+          fi
+          
           echo "simulation files:"
           cat files_to_copy.txt
 
-          USERNAME="${{ steps.getpr.outputs.username }}"
-          ssh baker "mkdir -p ~/simulations/$USERNAME"
+          ssh baker "mkdir -p ~/simulations/$USERNAME; rm -rf ~/simulations/$USERNAME/*"
+      
+          # Create space-separated list of existing files
+          FILES=$(awk '{print "submissions/" $0}' files_to_copy.txt | xargs -r ls 2>/dev/null)
+      
+          if [ -z "$FILES" ]; then
+            echo "⚠️ No existing files to copy. Exiting."
+            exit 0
+          fi
+      
+          echo "Copying files to baker..."
+          scp $FILES baker:~/simulations/$USERNAME/
+        
 
-          while IFS= read -r file; do
-            echo "Copying $file to baker:~/simulations/$USERNAME/"
-            scp "submissions/$file" baker:~/simulations/$USERNAME/
-            if [ $? -ne 0 ]; then
-              echo "❌ Failed to copy $file"
-              exit 1
-            fi
-          done < files_to_copy.txt
+      # - name: Copy .py files to Baker
+      #   if: steps.check_files.outputs.found == 'true'
+      #   run: |
 
+      #     PR_NUMBER="${{ steps.getpr.outputs.pr_number }}"
+      #     echo "Simulating for PR $PR_NUMBER"
+      #     echo "simulation files:"
+      #     cat files_to_copy.txt
+
+      #     USERNAME="${{ steps.getpr.outputs.username }}"
+      #     ssh baker "mkdir -p ~/simulations/$USERNAME; rm -rf ~/simulations/$USERNAME/*"
+
+      #     while IFS= read -r file; do
+      #       if [ -f "submissions/$file" ]; then
+      #         echo "Copying $file to baker:~/simulations/$USERNAME/"
+      #         scp "submissions/$file" baker:~/simulations/$USERNAME/
+      #         if [ $? -ne 0 ]; then
+      #           echo "❌ Failed to copy $file"
+      #           exit 1
+      #         fi
+      #       else
+      #         echo "⚠️ File submissions/$file not found (possibly deleted), skipping."
+      #       fi
+      #     done < files_to_copy.txt
 
       - name: Run simulation and fetch results
         if: steps.check_files.outputs.found == 'true'
@@ -121,6 +177,9 @@ jobs:
 
           echo "Running remote simulation for $USERNAME"
 
+          echo "Formatting comment..."
+          echo "This is an experimental feature. The goal is to run a circuit simulation on the design, and return the results for human verification." > comment.txt
+
           for file in $FILE_LIST; do
             FILE_BASENAME=$(basename "$file")
             FILE_REMOTE="~/simulations/$USERNAME/$FILE_BASENAME"
@@ -128,15 +187,28 @@ jobs:
             
             echo "Starting simulation on Baker for $FILE_BASENAME"
 
-            ssh baker "cd simulations && python3 run_circuit_simulation.py $USERNAME/$FILE_BASENAME" \
+            # 5 min time limit
+            timeout 300s ssh baker "cd simulations && python3 run_circuit_simulation.py $USERNAME/$FILE_BASENAME" \
               > sim_stdout.txt 2> sim_stderr.txt
+            RET_CODE=$?
+
+            if [ $RET_CODE -eq 124 ]; then
+              echo "❌ SSH command timed out."
+            fi
 
             echo "Fetching new output files from Baker..."
-            rsync -avz --ignore-existing --update baker:simulations/$USERNAME/ ./output/
+            timeout 60s rsync -avz --ignore-existing --update baker:simulations/$USERNAME/ ./output/
 
-            echo "Formatting comment..."
-            echo "This is an experimental feature. The goal is to run a circuit simulation on the design, and return the results for human verification." > comment.txt
-            echo "✅ Simulation results for \`$FILE_BASENAME\`" >> comment.txt
+            if [ $RET_CODE -eq 124 ]; then
+              echo "❌ rsync command timed out."
+            fi
+
+            if [ $RET_CODE -eq 0 ]; then
+              echo "✅ Simulation results for \`$FILE_BASENAME\`" >> comment.txt
+            else
+              echo "❌ Simulation failed for \`$FILE_BASENAME\` (exit code $RET_CODE)" >> comment.txt
+            fi
+    
             echo "" >> comment.txt
 
             if [ -s sim_stdout.txt ]; then
@@ -147,13 +219,13 @@ jobs:
               echo "" >> comment.txt
             fi
 
-            if [ -s sim_stderr.txt ]; then
-              echo "**stderr:**" >> comment.txt
-              echo '```' >> comment.txt
-              cat sim_stderr.txt >> comment.txt
-              echo '```' >> comment.txt
-              echo "" >> comment.txt
-            fi
+            #if [ -s sim_stderr.txt ]; then
+            #  echo "**stderr:**" >> comment.txt
+            #  echo '```' >> comment.txt
+            #  cat sim_stderr.txt >> comment.txt
+            #  echo '```' >> comment.txt
+            #  echo "" >> comment.txt
+            #fi
 
           done
 
@@ -180,10 +252,10 @@ jobs:
           git config user.email "github-actions@github.com"
 
           mkdir -p submissions
-          cp ../output/*.png submissions/ || echo "No PNGs found"
+          cp ../output/*.png submissions/circuit_simulations/ || echo "No PNGs found"
 
           echo "git add"
-          git add submissions/*.png || true
+          git add submissions/circuit_simulations/*.png || true
           echo "git commit"
           git commit -m "Add simulation result PNGs for PR #$PR_NUMBER" || echo "No changes"
           echo "git push origin"
@@ -202,10 +274,56 @@ jobs:
           for img in output/*.png; do
             [ -f "$img" ] || continue
             FILENAME=$(basename "$img")
-            echo "![${FILENAME}](https://github.com/${FORK_REPO}/blob/${BRANCH_NAME}/submissions/${FILENAME}?raw=true)" >> comment.txt
+            echo "![${FILENAME}](https://github.com/${FORK_REPO}/blob/${BRANCH_NAME}/submissions/circuit_simulations/${FILENAME}?raw=true)" >> comment.txt
           done
-
+          echo "" >> comment.txt
+          # echo "_To re-run this simulation, comment **please resimulate** below._" >> comment.txt  # not working
+          echo "_To re-run this simulation, please make a change to the layout file (simply running V verification will change the date stamp in the layout), save it, and upload it to your GitHub fork. This will trigger this simulation to run again._" >> comment.txt
+          echo "" >> comment.txt
+          echo "_We have implemented automated computation of the ebeam-dc-halfring-straight s-parameters, for TE 1550. If the parameters chosen in the design were missing, a simulation job was submitted, and the CML on the server will be automatically updated, and available on for future circuit simulations._" >> comment.txt
+          echo "" >> comment.txt
           
+
+      # - name: Delete previous simulation comment
+      #   if: steps.check_files.outputs.found == 'true'
+      #   run: |
+      #     PR_NUMBER="${{ steps.getpr.outputs.pr_number }}"
+
+      #     echo "Checking for previous simulation comment on PR #$PR_NUMBER"
+      #     COMMENTS=$(gh pr view "$PR_NUMBER" --comments --json comments -q '.comments[] | {id: .id, body: .body}' | jq -c '.')
+
+      #     DELETE_COMMENT_ID=$(echo "$COMMENTS" | jq -r 'select(.body | contains("✅ Simulation results for")) | .id' | tail -n1)
+
+      #     if [ -n "$DELETE_COMMENT_ID" ]; then
+      #       echo "Deleting previous comment with ID: $DELETE_COMMENT_ID"
+      #       gh issue comment delete "$DELETE_COMMENT_ID" --repo "${{ github.repository }}" --yes
+      #       # gh api repos/${{ github.repository }}/issues/comments/$DELETE_COMMENT_ID -X DELETE
+      #       RET_CODE=$?
+      #       if [ $RET_CODE -ne 0 ]; then
+      #         echo "Error with gh command"
+      #       fi
+      #     else
+      #       echo "No previous simulation comment found."
+      #     fi
+      #   env:
+      #     GH_TOKEN: ${{ secrets.PAT }}
+
+      - name: Find existing simulation comment
+        uses: peter-evans/find-comment@v3  
+        if: steps.check_files.outputs.found == 'true'
+        id: fc
+        with:
+          issue-number: ${{ steps.getpr.outputs.pr_number }}
+          body-includes: "✅ Simulation results for"
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+
+      - name: Update comment
+        if: steps.fc.outputs.comment-id != ''
+        run: |
+          dt=$(TZ='America/Los_Angeles' date '+%Y-%m-%d %H:%M:%S %Z')
+          echo " - Simulation updated: $dt " >> comment.txt
+              
       - name: Post simulation results as PR comment
         if: steps.check_files.outputs.found == 'true'
         uses: peter-evans/create-or-update-comment@v3
@@ -214,4 +332,6 @@ jobs:
           repository: ${{ github.repository }}
           issue-number: ${{ steps.getpr.outputs.pr_number }}
           body-path: comment.txt
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          edit-mode: replace
           

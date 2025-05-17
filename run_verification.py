@@ -36,31 +36,35 @@ except:
 import klayout.db as pya
 
 def top_cell_with_most_subcells_or_shapes(layout):
-    """
-    Returns the top cell that contains the most subcells or the most shapes in a KLayout layout.
+   """
+   Returns the top cell that contains the most subcells or the most shapes in a KLayout layout.
 
-    :param layout: pya.Layout object
-    :return: The top cell with the most subcells or shapes
-    
-    by ChatGPT
-    """
-    top_cells = layout.top_cells()
+   :param layout: pya.Layout object
+   :return: The top cell with the most subcells or shapes
+   
+   by ChatGPT
+   """
+   top_cells = layout.top_cells()
 
-    if not top_cells:
-        return None
+   if not top_cells:
+      return None
 
-    max_subcells = 0
-    best_cell = None
+   if len(top_cells) == 1:
+      return layout.top_cell()
 
-    for top_cell in top_cells:
-        subcell_count = sum(1 for _ in top_cell.each_child_cell())  # Count subcells
+   max_subcells = -1
+   best_cell = None
 
-        # Prioritize by subcells first, then shapes if there's a tie
-        if subcell_count > max_subcells:
-            max_subcells = subcell_count
-            best_cell = top_cell
+   for top_cell in top_cells:
+      subcell_count = sum(1 for _ in top_cell.each_child_cell())  # Count subcells
 
-    return best_cell
+      # Prioritize by subcells first, then shapes if there's a tie
+      if subcell_count > max_subcells:
+         max_subcells = subcell_count
+         best_cell = top_cell
+
+   print (f' - found multiple top cells: {[c.name for c in top_cells]}, chose {best_cell.name}')
+   return best_cell
 
 # Example usage
 # layout = pya.Layout()  # Load your layout

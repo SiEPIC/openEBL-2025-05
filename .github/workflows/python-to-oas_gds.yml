@@ -102,6 +102,52 @@ jobs:
           name: python-to-oas-gds
           path: python_to_oas_gds/
 
+      - name: Debug fork info
+        run: |
+          echo "PR fork repo: ${{ github.event.pull_request.head.repo.full_name }}"
+          echo "PR fork branch: ${{ github.event.pull_request.head.ref }}"
+
+
+
+      - name: Check if Actions are enabled on fork
+        id: check_fork_actions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORK_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          echo "Checking Actions on forked repo: $FORK_REPO"
+          RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/repos/$FORK_REPO/actions/permissions)
+      
+          ENABLED=$(echo "$RESPONSE" | jq -r '.enabled')
+          echo "Fork Actions enabled: $ENABLED"
+      
+          if [ "$ENABLED" != "true" ]; then
+            echo "Fork has Actions disabled."
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "❌ GitHub Actions are disabled on your fork."
+            echo "To enable:"
+            echo "  1. Visit https://github.com/$FORK_REPO/actions"
+            echo "  2. Click the 'Enable workflows' button at the top."
+            # exit 1
+          else
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Debug GitHub context
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Fork PR: ${{ github.event.pull_request.head.repo.full_name }}"
+          
+      # - name: Comment PR
+      #   uses: thollander/actions-comment-pull-request@v2
+      #   with:
+      #     message: |
+      #       Thank you for your pull request! :wave:
+      #     comment_tag: welcome-message
+  
+          
       - name: commit outputted oas and gds files into repository
         run: |
           git config --local user.email "${{ github.actor }}@users.noreply.github.com"
@@ -118,5 +164,5 @@ jobs:
           echo "done: git commit"
           git push
           echo "done: git push"
-        if: github.event_name != 'pull_request'
-
+        #if: github.event_name != 'pull_request'
+            
