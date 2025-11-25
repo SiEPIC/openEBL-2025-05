@@ -83,7 +83,7 @@ The verification and merging is performed using GitHub actions. The repository i
 Click on the following link to download the EBeam.oas merged layout file:
 
 ## Measurement data
-https://qdot-nexus.phas.ubc.ca:25683/s/tBoG5bK5aPs3yTY
+https://qdot-nexus.phas.ubc.ca:25683/s/wKS48GJMTEAcLy7
 
 ## SEM images of the fabricated designs
 
